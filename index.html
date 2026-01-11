@@ -1,0 +1,2430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Virtual Lab: Cancer Detection Simulation</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.15.0/dist/tf.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #0c2461 0%, #1e3799 100%);
+            color: #333;
+            line-height: 1.6;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.97);
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding-bottom: 25px;
+            border-bottom: 2px solid rgba(12, 36, 97, 0.2);
+            position: relative;
+        }
+        
+        header::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 30%;
+            width: 40%;
+            height: 4px;
+            background: linear-gradient(90deg, #0c2461, #1e3799);
+            border-radius: 2px;
+        }
+        
+        h1 {
+            color: #0c2461;
+            font-size: 2.8rem;
+            margin-bottom: 15px;
+            background: linear-gradient(90deg, #0c2461, #1e3799);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .subtitle {
+            color: #4a69bd;
+            font-size: 1.3rem;
+            margin-bottom: 20px;
+            font-weight: 300;
+        }
+        
+        .time-badge {
+            display: inline-block;
+            background: linear-gradient(90deg, #0c2461, #1e3799);
+            color: white;
+            padding: 8px 25px;
+            border-radius: 30px;
+            font-weight: 600;
+            margin-bottom: 25px;
+            box-shadow: 0 5px 15px rgba(12, 36, 97, 0.4);
+        }
+        
+        .lab-step {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            border-left: 6px solid #0c2461;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+            transition: all 0.4s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .lab-step::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: linear-gradient(90deg, #0c2461, #1e3799);
+        }
+        
+        .lab-step:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+        }
+        
+        .step-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .step-number {
+            background: linear-gradient(135deg, #0c2461, #1e3799);
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1.2rem;
+            box-shadow: 0 5px 15px rgba(12, 36, 97, 0.4);
+        }
+        
+        .step-title {
+            font-size: 1.4rem;
+            color: #0c2461;
+            flex-grow: 1;
+            margin-left: 20px;
+            font-weight: 600;
+        }
+        
+        .step-time {
+            color: #4a69bd;
+            font-weight: 600;
+            background: #f1f8ff;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+        }
+        
+        .image-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        
+        .image-card {
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+            cursor: pointer;
+            border: 3px solid transparent;
+        }
+        
+        .image-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 30px rgba(0,0,0,0.2);
+        }
+        
+        .image-card.selected {
+            border-color: #0c2461;
+            box-shadow: 0 10px 25px rgba(12, 36, 97, 0.3);
+        }
+        
+        .image-card.tumor {
+            border-color: #e74c3c;
+        }
+        
+        .image-card.normal {
+            border-color: #2ecc71;
+        }
+        
+        .image-preview {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+            background: #f8f9fa;
+        }
+        
+        .image-label {
+            padding: 10px;
+            text-align: center;
+            font-weight: 600;
+            background: white;
+        }
+        
+        .tumor-label {
+            color: #e74c3c;
+            background: rgba(231, 76, 60, 0.1);
+        }
+        
+        .normal-label {
+            color: #2ecc71;
+            background: rgba(46, 204, 113, 0.1);
+        }
+        
+        .controls-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+            margin: 25px 0;
+        }
+        
+        .control-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+            border: 1px solid #eaeaea;
+            transition: transform 0.3s ease;
+        }
+        
+        .control-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .control-card h3 {
+            color: #0c2461;
+            margin-bottom: 20px;
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .control-card h3 i {
+            color: #0c2461;
+            font-size: 1.2rem;
+        }
+        
+        .slider-container {
+            margin: 20px 0;
+        }
+        
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .slider-label span:first-child {
+            font-weight: 600;
+            color: #0c2461;
+        }
+        
+        .slider-label span:last-child {
+            font-weight: 700;
+            color: #0c2461;
+            font-size: 1.1rem;
+        }
+        
+        input[type="range"] {
+            width: 100%;
+            height: 10px;
+            border-radius: 5px;
+            background: linear-gradient(90deg, #0c2461, #1e3799);
+            outline: none;
+            -webkit-appearance: none;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            background: white;
+            border: 3px solid #0c2461;
+            cursor: pointer;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+        }
+        
+        button {
+            background: linear-gradient(90deg, #0c2461, #1e3799);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 50px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s;
+            margin: 5px;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 5px 15px rgba(12, 36, 97, 0.4);
+        }
+        
+        button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px rgba(12, 36, 97, 0.6);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        button:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .btn-secondary {
+            background: linear-gradient(90deg, #2ecc71, #27ae60);
+            box-shadow: 0 5px 15px rgba(46, 204, 113, 0.4);
+        }
+        
+        .btn-secondary:hover {
+            box-shadow: 0 10px 25px rgba(46, 204, 113, 0.6);
+        }
+        
+        .btn-tertiary {
+            background: linear-gradient(90deg, #e74c3c, #c0392b);
+            box-shadow: 0 5px 15px rgba(231, 76, 60, 0.4);
+        }
+        
+        .btn-tertiary:hover {
+            box-shadow: 0 10px 25px rgba(231, 76, 60, 0.6);
+        }
+        
+        .button-group {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 15px;
+            margin: 25px 0;
+        }
+        
+        .result-box {
+            background: linear-gradient(135deg, rgba(12, 36, 97, 0.1), rgba(30, 55, 153, 0.1));
+            border-radius: 15px;
+            padding: 25px;
+            margin: 25px 0;
+            border-left: 5px solid #0c2461;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+        }
+        
+        .result-box h3 {
+            color: #0c2461;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .result-box h3 i {
+            color: #0c2461;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 350px;
+            margin: 25px 0;
+            width: 100%;
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+            border: 1px solid #eaeaea;
+        }
+        
+        .model-comparison {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 25px;
+            margin: 30px 0;
+        }
+        
+        .model-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+            border-top: 5px solid #0c2461;
+            transition: all 0.4s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .model-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: linear-gradient(90deg, #0c2461, #1e3799);
+        }
+        
+        .model-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+        }
+        
+        .model-card h4 {
+            color: #0c2461;
+            margin-bottom: 20px;
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .model-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.2rem;
+        }
+        
+        .cnn-icon { background: #0c2461; }
+        .resnet-icon { background: #3498db; }
+        .vgg-icon { background: #9b59b6; }
+        .mobile-icon { background: #2ecc71; }
+        
+        .model-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .stat-card {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            transition: all 0.3s;
+            border: 2px solid transparent;
+        }
+        
+        .stat-card:hover {
+            border-color: #0c2461;
+            background: white;
+        }
+        
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #0c2461;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            font-size: 0.9rem;
+            color: #4a69bd;
+            font-weight: 500;
+        }
+        
+        .best-model {
+            border-top-color: #2ecc71;
+            box-shadow: 0 15px 35px rgba(46, 204, 113, 0.2);
+        }
+        
+        .best-badge {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: #2ecc71;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        
+        .prediction-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 30px;
+            margin: 30px 0;
+        }
+        
+        .prediction-input {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.1);
+            border: 1px solid #eaeaea;
+        }
+        
+        .prediction-output {
+            background: linear-gradient(135deg, #0c2461, #1e3799);
+            padding: 30px;
+            border-radius: 15px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            text-align: center;
+            box-shadow: 0 15px 40px rgba(12, 36, 97, 0.3);
+        }
+        
+        .prediction-value {
+            font-size: 4rem;
+            font-weight: 700;
+            margin: 20px 0;
+            text-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        
+        .prediction-label {
+            font-size: 1.2rem;
+            font-weight: 500;
+            opacity: 0.9;
+        }
+        
+        .tumor-indicator {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 1.3rem;
+            margin: 20px 0;
+            text-align: center;
+            padding: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .tumor-positive {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+        }
+        
+        .tumor-negative {
+            background: linear-gradient(135deg, #2ecc71, #27ae60);
+        }
+        
+        .interpretation-box {
+            background: linear-gradient(135deg, rgba(241, 196, 15, 0.1), rgba(243, 156, 18, 0.1));
+            border-radius: 15px;
+            padding: 30px;
+            margin: 30px 0;
+            border-left: 5px solid #f1c40f;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.05);
+        }
+        
+        .interpretation-box h3 {
+            color: #d35400;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .data-info {
+            background: linear-gradient(135deg, rgba(52, 152, 219, 0.1), rgba(41, 128, 185, 0.1));
+            border-radius: 15px;
+            padding: 20px;
+            margin: 20px 0;
+            border: 1px solid rgba(52, 152, 219, 0.2);
+        }
+        
+        .data-info-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 12px 0;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(52, 152, 219, 0.1);
+        }
+        
+        .data-info-item:last-child {
+            border-bottom: none;
+        }
+        
+        .progress-container {
+            width: 100%;
+            background: #ecf0f1;
+            border-radius: 10px;
+            margin: 15px 0;
+            height: 20px;
+            overflow: hidden;
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #0c2461, #1e3799);
+            border-radius: 10px;
+            transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+            box-shadow: 0 3px 10px rgba(12, 36, 97, 0.4);
+        }
+        
+        .developer-credit {
+            text-align: center;
+            margin-top: 40px;
+            padding-top: 30px;
+            border-top: 2px solid rgba(12, 36, 97, 0.3);
+            font-size: 1.2rem;
+            color: #0c2461;
+            font-weight: 700;
+            position: relative;
+        }
+        
+        .developer-credit::before {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: 30%;
+            width: 40%;
+            height: 4px;
+            background: linear-gradient(90deg, #0c2461, #1e3799);
+            border-radius: 2px;
+        }
+        
+        footer {
+            text-align: center;
+            margin-top: 50px;
+            padding-top: 30px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 0.9rem;
+            background: rgba(0, 0, 0, 0.1);
+            padding: 25px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .notification-area {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            max-width: 350px;
+        }
+        
+        .notification {
+            padding: 20px;
+            border-radius: 15px;
+            color: white;
+            font-weight: 600;
+            animation: slideIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .notification.success {
+            background: linear-gradient(135deg, rgba(39, 174, 96, 0.9), rgba(46, 204, 113, 0.9));
+        }
+        
+        .notification.error {
+            background: linear-gradient(135deg, rgba(231, 76, 60, 0.9), rgba(192, 57, 43, 0.9));
+        }
+        
+        .notification.info {
+            background: linear-gradient(135deg, rgba(52, 152, 219, 0.9), rgba(41, 128, 185, 0.9));
+        }
+        
+        .notification.warning {
+            background: linear-gradient(135deg, rgba(241, 196, 15, 0.9), rgba(243, 156, 18, 0.9));
+        }
+        
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        
+        @media (max-width: 992px) {
+            .container {
+                padding: 25px;
+            }
+            
+            h1 {
+                font-size: 2.2rem;
+            }
+            
+            .controls-grid, .model-comparison, .prediction-container {
+                grid-template-columns: 1fr;
+            }
+            
+            .chart-container {
+                height: 300px;
+            }
+            
+            .image-grid {
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            }
+        }
+        
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            
+            .container {
+                padding: 20px;
+            }
+            
+            h1 {
+                font-size: 1.8rem;
+            }
+            
+            .subtitle {
+                font-size: 1.1rem;
+            }
+            
+            .lab-step {
+                padding: 20px;
+            }
+            
+            .button-group {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            button {
+                width: 100%;
+                justify-content: center;
+            }
+            
+            .image-grid {
+                grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            }
+        }
+        
+        /* Scrollbar Styling */
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, #0c2461, #1e3799);
+            border-radius: 10px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(135deg, #0a1d4d, #182d7a);
+        }
+        
+        /* Image Processing Effects */
+        .processing-controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .processing-card {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 2px solid transparent;
+        }
+        
+        .processing-card:hover {
+            border-color: #0c2461;
+            background: white;
+            transform: translateY(-3px);
+        }
+        
+        .processing-card.active {
+            border-color: #0c2461;
+            background: rgba(12, 36, 97, 0.1);
+        }
+        
+        .processing-icon {
+            font-size: 2rem;
+            color: #0c2461;
+            margin-bottom: 10px;
+        }
+        
+        /* Histopathology Images */
+        .histo-image {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+        
+        .image-container {
+            position: relative;
+            overflow: hidden;
+            border-radius: 10px;
+            margin: 10px 0;
+        }
+        
+        .image-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 10px;
+            transform: translateY(100%);
+            transition: transform 0.3s ease;
+        }
+        
+        .image-container:hover .image-overlay {
+            transform: translateY(0);
+        }
+        
+        .tumor-region {
+            position: absolute;
+            border: 3px solid #e74c3c;
+            background: rgba(231, 76, 60, 0.2);
+            border-radius: 5px;
+            pointer-events: none;
+        }
+        
+        /* Confusion Matrix */
+        .confusion-matrix {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1px;
+            background: #ddd;
+            border-radius: 8px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+        
+        .matrix-cell {
+            background: white;
+            padding: 15px;
+            text-align: center;
+            font-weight: 600;
+        }
+        
+        .matrix-header {
+            background: #0c2461;
+            color: white;
+        }
+        
+        .tp-cell { background: rgba(46, 204, 113, 0.3); }
+        .fp-cell { background: rgba(231, 76, 60, 0.3); }
+        .fn-cell { background: rgba(241, 196, 15, 0.3); }
+        .tn-cell { background: rgba(52, 152, 219, 0.3); }
+        
+        /* Loading Animation */
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-microscope"></i> Virtual Lab: Cancer Detection Simulation</h1>
+            <div class="subtitle">Light & Imaging – Binary Classification of Histopathology Images</div>
+            <div class="time-badge"><i class="fas fa-clock"></i> Estimated Time: 2 Hours</div>
+        </header>
+        
+        <!-- Step 1: Introduction -->
+        <section class="lab-step">
+            <div class="step-header">
+                <div class="step-number">1</div>
+                <div class="step-title">Introduction & Objective</div>
+                <div class="step-time"><i class="fas fa-clock"></i> 10 min</div>
+            </div>
+            <p>Welcome to the virtual lab for cancer detection using histopathology image analysis! In this experiment, you will:</p>
+            <ul style="margin: 15px 0 15px 25px;">
+                <li>Explore histopathology images from Camelyon16 dataset</li>
+                <li>Train deep learning models for tumor detection</li>
+                <li>Compare CNN architectures for binary classification</li>
+                <li>Evaluate model performance using medical metrics</li>
+                <li>Test the model on new histopathology images</li>
+            </ul>
+            
+            <div class="data-info">
+                <h4><i class="fas fa-info-circle"></i> Histopathology Imaging Basics</h4>
+                <p><strong>Camelyon16 Dataset:</strong> Contains 400 whole-slide images of lymph node sections stained with H&E</p>
+                
+                <div class="data-info-item">
+                    <span><i class="fas fa-image"></i> Image Type:</span>
+                    <span>Histopathology (H&E stained)</span>
+                </div>
+                <div class="data-info-item">
+                    <span><i class="fas fa-crosshairs"></i> Target:</span>
+                    <span>Binary Classification (Tumor/Normal)</span>
+                </div>
+                <div class="data-info-item">
+                    <span><i class="fas fa-expand"></i> Resolution:</span>
+                    <span>Patches: 256×256 pixels</span>
+                </div>
+                <div class="data-info-item">
+                    <span><i class="fas fa-database"></i> Dataset Size:</span>
+                    <span>270 tumor patches + 270 normal patches</span>
+                </div>
+            </div>
+            
+            <p><strong>Clinical Relevance:</strong> Automated detection of tumor regions in histopathology images can assist pathologists in cancer diagnosis, reducing human error and improving diagnostic accuracy.</p>
+        </section>
+        
+        <!-- Step 2: Explore Dataset -->
+        <section class="lab-step">
+            <div class="step-header">
+                <div class="step-number">2</div>
+                <div class="step-title">Explore Histopathology Images</div>
+                <div class="step-time"><i class="fas fa-clock"></i> 20 min</div>
+            </div>
+            
+            <p>Histopathology images show tissue microstructure. Tumor regions exhibit abnormal cell growth, irregular nuclei, and disrupted tissue architecture.</p>
+            
+            <div class="button-group">
+                <button class="btn-secondary" onclick="loadSampleDataset()">
+                    <i class="fas fa-database"></i> Load Sample Images
+                </button>
+                <button onclick="showTumorExamples()">
+                    <i class="fas fa-search-plus"></i> Show Tumor Examples
+                </button>
+                <button onclick="showNormalExamples()">
+                    <i class="fas fa-search"></i> Show Normal Examples
+                </button>
+            </div>
+            
+            <div id="imageGallery" class="image-grid">
+                <!-- Images will be loaded here -->
+            </div>
+            
+            <div class="data-info" style="display: none;" id="datasetInfo">
+                <h4><i class="fas fa-chart-bar"></i> Dataset Information</h4>
+                <div class="data-info-item">
+                    <span><i class="fas fa-images"></i> Total Images:</span>
+                    <span id="totalImages">0</span>
+                </div>
+                <div class="data-info-item">
+                    <span><i class="fas fa-tag"></i> Tumor Images:</span>
+                    <span id="tumorImages">0</span>
+                </div>
+                <div class="data-info-item">
+                    <span><i class="fas fa-tag"></i> Normal Images:</span>
+                    <span id="normalImages">0</span>
+                </div>
+                <div class="data-info-item">
+                    <span><i class="fas fa-balance-scale"></i> Class Balance:</span>
+                    <span id="classBalance">Balanced</span>
+                </div>
+            </div>
+            
+            <div id="imageDetails" style="display: none;">
+                <h4><i class="fas fa-eye"></i> Image Details</h4>
+                <div class="image-container">
+                    <img id="selectedImage" class="histo-image" src="" alt="Selected Histopathology Image">
+                    <div class="image-overlay" id="imageDescription">
+                        Histopathology image details will appear here
+                    </div>
+                </div>
+                <div id="tumorRegions" style="margin-top: 15px;"></div>
+            </div>
+        </section>
+        
+        <!-- Step 3: Image Preprocessing -->
+        <section class="lab-step">
+            <div class="step-header">
+                <div class="step-number">3</div>
+                <div class="step-title">Image Preprocessing & Augmentation</div>
+                <div class="step-time"><i class="fas fa-clock"></i> 15 min</div>
+            </div>
+            
+            <p>Preprocessing is crucial for improving model performance. Select preprocessing steps to apply:</p>
+            
+            <div class="processing-controls">
+                <div class="processing-card" onclick="toggleProcessing('normalize')">
+                    <div class="processing-icon">
+                        <i class="fas fa-adjust"></i>
+                    </div>
+                    <div>Normalize Colors</div>
+                    <div class="checkbox-desc">Standardize H&E staining</div>
+                </div>
+                <div class="processing-card" onclick="toggleProcessing('augment')">
+                    <div class="processing-icon">
+                        <i class="fas fa-sync-alt"></i>
+                    </div>
+                    <div>Data Augmentation</div>
+                    <div class="checkbox-desc">Flip, rotate, zoom</div>
+                </div>
+                <div class="processing-card" onclick="toggleProcessing('contrast')">
+                    <div class="processing-icon">
+                        <i class="fas fa-sun"></i>
+                    </div>
+                    <div>Contrast Enhancement</div>
+                    <div class="checkbox-desc">Improve tissue visibility</div>
+                </div>
+                <div class="processing-card" onclick="toggleProcessing('remove')">
+                    <div class="processing-icon">
+                        <i class="fas fa-eraser"></i>
+                    </div>
+                    <div>Remove Artifacts</div>
+                    <div class="checkbox-desc">Clean scanning artifacts</div>
+                </div>
+            </div>
+            
+            <div class="controls-grid">
+                <div class="control-card">
+                    <h3><i class="fas fa-sliders-h"></i> Preprocessing Parameters</h3>
+                    <div class="slider-container">
+                        <div class="slider-label">
+                            <span>Contrast Enhancement:</span>
+                            <span id="contrastValue">1.5</span>
+                        </div>
+                        <input type="range" id="contrastSlider" min="1" max="3" step="0.1" value="1.5" oninput="updateContrast()">
+                    </div>
+                    
+                    <div class="slider-container">
+                        <div class="slider-label">
+                            <span>Brightness:</span>
+                            <span id="brightnessValue">1.2</span>
+                        </div>
+                        <input type="range" id="brightnessSlider" min="0.5" max="2" step="0.1" value="1.2" oninput="updateBrightness()">
+                    </div>
+                    
+                    <div class="slider-container">
+                        <div class="slider-label">
+                            <span>Augmentation Intensity:</span>
+                            <span id="augmentationValue">0.3</span>
+                        </div>
+                        <input type="range" id="augmentationSlider" min="0" max="0.5" step="0.05" value="0.3" oninput="updateAugmentation()">
+                    </div>
+                </div>
+                
+                <div class="control-card">
+                    <h3><i class="fas fa-image"></i> Preprocessing Preview</h3>
+                    <div style="text-align: center; margin: 15px 0;">
+                        <img id="preprocessingPreview" src="" alt="Preprocessing Preview" style="width: 100%; max-height: 200px; object-fit: contain; border-radius: 8px; border: 2px solid #ddd;">
+                    </div>
+                    <div class="button-group">
+                        <button onclick="applyPreprocessing()">
+                            <i class="fas fa-play"></i> Apply Preprocessing
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Step 4: Model Training -->
+        <section class="lab-step">
+            <div class="step-header">
+                <div class="step-number">4</div>
+                <div class="step-title">Train Deep Learning Models</div>
+                <div class="step-time"><i class="fas fa-clock"></i> 25 min</div>
+            </div>
+            
+            <div class="controls-grid">
+                <div class="control-card">
+                    <h3><i class="fas fa-cog"></i> Training Configuration</h3>
+                    <div class="slider-container">
+                        <div class="slider-label">
+                            <span>Train-Test Split:</span>
+                            <span id="splitValue">80%</span>
+                        </div>
+                        <input type="range" id="trainSplit" min="60" max="90" step="5" value="80" oninput="updateSplitValue()">
+                    </div>
+                    
+                    <div class="slider-container">
+                        <div class="slider-label">
+                            <span>Epochs:</span>
+                            <span id="epochsValue">20</span>
+                        </div>
+                        <input type="range" id="epochsSlider" min="10" max="50" step="5" value="20" oninput="updateEpochs()">
+                    </div>
+                    
+                    <div style="margin: 20px 0;">
+                        <label for="modelSelect" style="font-weight: 600; display: block; margin-bottom: 10px;">
+                            <i class="fas fa-robot"></i> Select CNN Architectures:
+                        </label>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                            <div>
+                                <input type="checkbox" id="modelCNN" checked>
+                                <label for="modelCNN">Basic CNN</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="modelResNet" checked>
+                                <label for="modelResNet">ResNet-50</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="modelVGG">
+                                <label for="modelVGG">VGG-16</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="modelMobileNet">
+                                <label for="modelMobileNet">MobileNetV2</label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="button-group" style="justify-content: center;">
+                        <button onclick="trainModels()" class="pulse">
+                            <i class="fas fa-play-circle"></i> Train All Models
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="control-card">
+                    <h3><i class="fas fa-brain"></i> CNN Architecture</h3>
+                    <div style="margin: 15px 0; padding: 15px; background: #f8f9fa; border-radius: 10px;">
+                        <div style="font-weight: 600; color: #0c2461; margin-bottom: 10px;">Convolutional Neural Network:</div>
+                        <div style="font-size: 0.9rem; color: #666;">
+                            <div>1. Convolution Layers (Feature extraction)</div>
+                            <div>2. Pooling Layers (Dimensionality reduction)</div>
+                            <div>3. Fully Connected Layers (Classification)</div>
+                            <div>4. Softmax Output (Tumor probability)</div>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-top: 20px;">
+                        <div class="progress-container">
+                            <div class="progress-bar" id="trainingProgress" style="width: 0%"></div>
+                        </div>
+                        <div style="text-align: center; margin-top: 10px; font-size: 0.9rem; color: #666;" id="trainingStatus">
+                            Ready to train
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="modelComparison" class="model-comparison" style="display: none;"></div>
+            
+            <div class="result-box" id="trainingResults" style="display: none;">
+                <h3><i class="fas fa-medal"></i> Training Results</h3>
+                <div id="bestModelInfo"></div>
+                <div class="chart-container">
+                    <canvas id="performanceChart"></canvas>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Step 5: Model Evaluation -->
+        <section class="lab-step">
+            <div class="step-header">
+                <div class="step-number">5</div>
+                <div class="step-title">Evaluate Model Performance</div>
+                <div class="step-time"><i class="fas fa-clock"></i> 15 min</div>
+            </div>
+            
+            <div id="evaluationControls" style="display: none;">
+                <div style="background: linear-gradient(135deg, rgba(12, 36, 97, 0.1), rgba(30, 55, 153, 0.1)); padding: 20px; border-radius: 15px; margin-bottom: 25px;">
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <div style="width: 60px; height: 60px; background: linear-gradient(135deg, #0c2461, #1e3799); border-radius: 15px; display: flex; align-items: center; justify-content: center; color: white; font-size: 1.5rem;">
+                            <i class="fas fa-crown"></i>
+                        </div>
+                        <div>
+                            <div style="font-size: 1.1rem; font-weight: 600; color: #0c2461;">Best Performing Model:</div>
+                            <div style="font-size: 1.4rem; font-weight: 700; color: #0c2461;" id="bestModelName">None selected</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="controls-grid">
+                    <div class="control-card">
+                        <h3><i class="fas fa-chart-line"></i> Performance Metrics</h3>
+                        <div class="model-stats">
+                            <div class="stat-card">
+                                <div class="stat-value" id="accuracyValue">0.00</div>
+                                <div class="stat-label">Accuracy</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value" id="precisionValue">0.00</div>
+                                <div class="stat-label">Precision</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value" id="recallValue">0.00</div>
+                                <div class="stat-label">Recall</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value" id="f1Value">0.00</div>
+                                <div class="stat-label">F1-Score</div>
+                            </div>
+                        </div>
+                        
+                        <div style="margin-top: 20px;">
+                            <h4>Confusion Matrix</h4>
+                            <div class="confusion-matrix">
+                                <div class="matrix-cell matrix-header"></div>
+                                <div class="matrix-cell matrix-header">Predicted Tumor</div>
+                                <div class="matrix-cell matrix-header">Predicted Normal</div>
+                                <div class="matrix-cell matrix-header">Actual Tumor</div>
+                                <div class="matrix-cell tp-cell" id="tpValue">0</div>
+                                <div class="matrix-cell fn-cell" id="fnValue">0</div>
+                                <div class="matrix-cell matrix-header">Actual Normal</div>
+                                <div class="matrix-cell fp-cell" id="fpValue">0</div>
+                                <div class="matrix-cell tn-cell" id="tnValue">0</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="control-card">
+                        <h3><i class="fas fa-chart-area"></i> ROC Curve & AUC</h3>
+                        <div class="chart-container">
+                            <canvas id="rocChart"></canvas>
+                        </div>
+                        <div style="text-align: center; margin-top: 15px;">
+                            <div class="stat-value" id="aucValue">0.00</div>
+                            <div class="stat-label">Area Under Curve (AUC)</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="noModelMessage" style="text-align: center; padding: 40px; background: linear-gradient(135deg, rgba(12, 36, 97, 0.05), rgba(30, 55, 153, 0.05)); border-radius: 15px; border: 2px dashed #0c2461;">
+                <div style="font-size: 3rem; color: #0c2461; margin-bottom: 20px;">
+                    <i class="fas fa-robot"></i>
+                </div>
+                <div style="font-size: 1.5rem; font-weight: 600; color: #0c2461; margin-bottom: 15px;">No Models Trained Yet</div>
+                <p style="color: #4a69bd; max-width: 600px; margin: 0 auto;">Please train models in <strong>Step 4</strong> to see evaluation metrics. Click "Train All Models" to get started.</p>
+            </div>
+        </section>
+        
+        <!-- Step 6: Test on New Images -->
+        <section class="lab-step">
+            <div class="step-header">
+                <div class="step-number">6</div>
+                <div class="step-title">Test Model on New Images</div>
+                <div class="step-time"><i class="fas fa-clock"></i> 15 min</div>
+            </div>
+            
+            <div id="predictionControls" style="display: none;">
+                <div class="prediction-container">
+                    <div class="prediction-input">
+                        <h3><i class="fas fa-upload"></i> Upload Test Image</h3>
+                        <div style="border: 3px dashed #0c2461; border-radius: 15px; padding: 40px 20px; text-align: center; background: rgba(12, 36, 97, 0.05); margin: 20px 0; cursor: pointer;" onclick="document.getElementById('imageUpload').click()">
+                            <div style="font-size: 4rem; color: #0c2461; margin-bottom: 15px;">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                            </div>
+                            <div style="font-size: 1.2rem; color: #0c2461; font-weight: 600; margin-bottom: 10px;">Upload Histopathology Image</div>
+                            <div style="color: #4a69bd; font-size: 0.95rem;">
+                                Click here or drag and drop histopathology image (JPG/PNG)
+                            </div>
+                            <input type="file" id="imageUpload" accept=".jpg,.jpeg,.png,.tiff" onchange="handleImageUpload(event)" style="display: none;">
+                        </div>
+                        
+                        <div class="button-group">
+                            <button onclick="loadRandomTestImage()">
+                                <i class="fas fa-random"></i> Load Random Test Image
+                            </button>
+                            <button class="btn-secondary" onclick="analyzeTumorRegions()">
+                                <i class="fas fa-search-plus"></i> Analyze Tumor Regions
+                            </button>
+                        </div>
+                        
+                        <div id="testImageContainer" style="margin-top: 20px; display: none;">
+                            <h4>Test Image Preview</h4>
+                            <div class="image-container">
+                                <img id="testImagePreview" class="histo-image" src="" alt="Test Image">
+                                <div class="image-overlay">
+                                    Uploaded test image for tumor detection
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="prediction-output">
+                        <h3><i class="fas fa-diagnoses"></i> Model Prediction</h3>
+                        <div class="prediction-label">Tumor Probability:</div>
+                        <div class="prediction-value" id="tumorProbability">--</div>
+                        <div class="prediction-label">Prediction:</div>
+                        <div class="tumor-indicator" id="tumorIndicator">--</div>
+                        <div id="predictionResult" style="margin: 15px 0; font-size: 1.1rem;">Upload an image to see prediction</div>
+                        <div id="confidenceInterval" style="background: rgba(255, 255, 255, 0.2); padding: 15px; border-radius: 10px; width: 100%;"></div>
+                    </div>
+                </div>
+                
+                <div class="result-box" style="margin-top: 30px;">
+                    <h3><i class="fas fa-clipboard-check"></i> Clinical Interpretation</h3>
+                    <div id="clinicalInterpretation">
+                        <p><strong>Note to Pathologist:</strong> This AI-assisted tool is designed to support, not replace, clinical diagnosis. All predictions should be verified by a qualified pathologist.</p>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-top: 20px;">
+                            <div style="background: rgba(231, 76, 60, 0.1); padding: 15px; border-radius: 10px; border-left: 4px solid #e74c3c;">
+                                <div style="font-weight: 600; color: #e74c3c;">High Risk Features:</div>
+                                <div style="font-size: 0.9rem; margin-top: 5px;">Irregular nuclei, high mitotic count, necrosis</div>
+                            </div>
+                            <div style="background: rgba(46, 204, 113, 0.1); padding: 15px; border-radius: 10px; border-left: 4px solid #2ecc71;">
+                                <div style="font-weight: 600; color: #2ecc71;">Normal Features:</div>
+                                <div style="font-size: 0.9rem; margin-top: 5px;">Regular architecture, uniform nuclei, clear boundaries</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Step 7: Lab Report -->
+        <section class="lab-step">
+            <div class="step-header">
+                <div class="step-number">7</div>
+                <div class="step-title">Generate Lab Report</div>
+                <div class="step-time"><i class="fas fa-clock"></i> 20 min</div>
+            </div>
+            
+            <div class="interpretation-box">
+                <h3><i class="fas fa-question-circle"></i> Questions for Your Lab Report</h3>
+                <p style="margin-bottom: 20px;">Answer these questions based on your experiment:</p>
+                <ol style="margin: 10px 0 10px 25px;">
+                    <li style="margin-bottom: 15px;"><strong>Which preprocessing steps were most effective for histopathology images?</strong> Explain why contrast enhancement and stain normalization are crucial.</li>
+                    <li style="margin-bottom: 15px;"><strong>Which CNN architecture performed best and why?</strong> Consider factors like model depth, residual connections, and parameter efficiency.</li>
+                    <li style="margin-bottom: 15px;"><strong>How do accuracy, precision, recall, and F1-score differ in medical diagnosis?</strong> Which metric is most important for cancer detection and why?</li>
+                    <li style="margin-bottom: 15px;"><strong>What challenges did you encounter in tumor detection?</strong> Discuss issues like tissue heterogeneity, staining variations, and artifact interference.</li>
+                    <li><strong>What are the clinical implications of your model's performance?</strong> How could this tool assist pathologists in real-world diagnosis?</li>
+                </ol>
+                
+                <div class="button-group">
+                    <button onclick="generateLabReport()">
+                        <i class="fas fa-file-alt"></i> Generate Lab Report
+                    </button>
+                    <button class="btn-secondary" onclick="saveAllResults()">
+                        <i class="fas fa-save"></i> Save All Results
+                    </button>
+                    <button class="btn-tertiary" onclick="resetLab()">
+                        <i class="fas fa-redo"></i> Reset Lab
+                    </button>
+                </div>
+            </div>
+        </section>
+        
+        <div class="developer-credit">
+            <i class="fas fa-flask"></i> Developed by Dr. P. Selvarengan | Light & Imaging Laboratory
+        </div>
+        
+        <footer>
+            <p><i class="fas fa-graduation-cap"></i> Virtual Lab: Cancer Detection Simulation Using Histopathology Images</p>
+            <p>Based on Camelyon16 Dataset | Educational Use Only | Not for Clinical Diagnosis</p>
+            <p>All computations are simulated for educational purposes.</p>
+        </footer>
+    </div>
+
+    <div class="notification-area" id="notificationArea"></div>
+
+    <script>
+        // Global variables
+        let dataset = [];
+        let processedData = [];
+        let selectedImages = [];
+        let bestModel = null;
+        let models = {};
+        let charts = {};
+        let isDatasetLoaded = false;
+        let isModelsTrained = false;
+        let activeProcessing = new Set();
+        
+        // Initialize when page loads
+        window.onload = function() {
+            initializeCharts();
+            loadSampleDataset();
+            showNotification('Welcome to Cancer Detection Virtual Lab! Explore histopathology images to begin.', 'info');
+        };
+        
+        // Notification system
+        function showNotification(message, type = 'info') {
+            const notificationArea = document.getElementById('notificationArea');
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            
+            let icon = 'info-circle';
+            if (type === 'success') icon = 'check-circle';
+            if (type === 'error') icon = 'exclamation-circle';
+            if (type === 'warning') icon = 'exclamation-triangle';
+            
+            notification.innerHTML = `
+                <i class="fas fa-${icon}" style="font-size: 1.5rem;"></i>
+                <div>${message}</div>
+            `;
+            
+            notificationArea.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                notification.style.transition = 'opacity 0.5s';
+                setTimeout(() => notification.remove(), 500);
+            }, 4000);
+        }
+        
+        // Step 2: Load sample dataset
+        function loadSampleDataset() {
+            // Simulated histopathology images from Camelyon16 dataset
+            dataset = [
+                { id: 1, type: 'tumor', label: 'Invasive Ductal Carcinoma', features: 'Irregular nuclei, high cellularity', confidence: 0.95 },
+                { id: 2, type: 'tumor', label: 'Lobular Carcinoma', features: 'Single file pattern, small cells', confidence: 0.88 },
+                { id: 3, type: 'normal', label: 'Normal Breast Tissue', features: 'Regular architecture, uniform nuclei', confidence: 0.92 },
+                { id: 4, type: 'tumor', label: 'Ductal Carcinoma in Situ', features: 'Cribriform pattern, necrosis', confidence: 0.91 },
+                { id: 5, type: 'normal', label: 'Fibroadenoma', features: 'Stromal proliferation, compressed ducts', confidence: 0.87 },
+                { id: 6, type: 'tumor', label: 'Medullary Carcinoma', features: 'Syncytial growth, lymphocytic infiltrate', confidence: 0.93 },
+                { id: 7, type: 'normal', label: 'Normal Lymph Node', features: 'Follicular architecture, sinus histiocytosis', confidence: 0.94 },
+                { id: 8, type: 'tumor', label: 'Metastatic Carcinoma', features: 'Epithelial clusters in lymph node', confidence: 0.96 }
+            ];
+            
+            displayImageGallery();
+            updateDatasetInfo();
+            isDatasetLoaded = true;
+            
+            showNotification('Sample histopathology images loaded! 8 images from Camelyon16 dataset.', 'success');
+        }
+        
+        function displayImageGallery() {
+            const gallery = document.getElementById('imageGallery');
+            gallery.innerHTML = '';
+            
+            dataset.forEach(image => {
+                const imageCard = document.createElement('div');
+                imageCard.className = `image-card ${image.type}`;
+                imageCard.onclick = () => selectImage(image.id);
+                
+                // Generate simulated histopathology image using canvas
+                const canvas = document.createElement('canvas');
+                canvas.width = 200;
+                canvas.height = 150;
+                const ctx = canvas.getContext('2d');
+                
+                // Draw simulated histopathology pattern
+                drawHistoPattern(ctx, image.type);
+                
+                imageCard.innerHTML = `
+                    <img class="image-preview" src="${canvas.toDataURL()}" alt="${image.label}">
+                    <div class="image-label ${image.type}-label">
+                        ${image.type === 'tumor' ? 'Tumor' : 'Normal'}
+                    </div>
+                `;
+                
+                gallery.appendChild(imageCard);
+            });
+        }
+        
+        function drawHistoPattern(ctx, type) {
+            const width = ctx.canvas.width;
+            const height = ctx.canvas.height;
+            
+            // Background
+            ctx.fillStyle = type === 'tumor' ? '#ffe6e6' : '#e6ffe6';
+            ctx.fillRect(0, 0, width, height);
+            
+            // Draw nuclei (circles)
+            const nucleiCount = type === 'tumor' ? 150 : 80;
+            const maxRadius = type === 'tumor' ? 4 : 3;
+            
+            for (let i = 0; i < nucleiCount; i++) {
+                const x = Math.random() * width;
+                const y = Math.random() * height;
+                const radius = 1 + Math.random() * maxRadius;
+                
+                // Nucleus color
+                ctx.fillStyle = type === 'tumor' ? 
+                    `rgba(100, 0, 0, ${0.3 + Math.random() * 0.3})` : 
+                    `rgba(0, 100, 0, ${0.2 + Math.random() * 0.2})`;
+                
+                ctx.beginPath();
+                ctx.arc(x, y, radius, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Nucleoli for tumor cells
+                if (type === 'tumor' && Math.random() > 0.7) {
+                    ctx.fillStyle = 'rgba(255, 0, 0, 0.8)';
+                    ctx.beginPath();
+                    ctx.arc(x, y, radius * 0.4, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+            
+            // Draw tissue architecture
+            ctx.strokeStyle = type === 'tumor' ? 'rgba(150, 50, 50, 0.3)' : 'rgba(50, 150, 50, 0.2)';
+            ctx.lineWidth = 1;
+            
+            for (let i = 0; i < (type === 'tumor' ? 10 : 15); i++) {
+                ctx.beginPath();
+                ctx.moveTo(Math.random() * width, Math.random() * height);
+                for (let j = 0; j < 5; j++) {
+                    ctx.lineTo(Math.random() * width, Math.random() * height);
+                }
+                ctx.stroke();
+            }
+        }
+        
+        function selectImage(imageId) {
+            const image = dataset.find(img => img.id === imageId);
+            if (!image) return;
+            
+            // Update selected images
+            const index = selectedImages.indexOf(imageId);
+            if (index === -1) {
+                selectedImages.push(imageId);
+            } else {
+                selectedImages.splice(index, 1);
+            }
+            
+            // Update UI
+            const cards = document.querySelectorAll('.image-card');
+            cards.forEach(card => {
+                if (card.onclick.toString().includes(imageId.toString())) {
+                    card.classList.toggle('selected');
+                }
+            });
+            
+            // Show image details
+            document.getElementById('imageDetails').style.display = 'block';
+            const canvas = document.createElement('canvas');
+            canvas.width = 400;
+            canvas.height = 300;
+            const ctx = canvas.getContext('2d');
+            drawHistoPattern(ctx, image.type);
+            
+            document.getElementById('selectedImage').src = canvas.toDataURL();
+            document.getElementById('imageDescription').innerHTML = `
+                <strong>${image.label}</strong><br>
+                ${image.features}<br>
+                <small>Confidence: ${(image.confidence * 100).toFixed(1)}%</small>
+            `;
+            
+            // Show tumor regions if applicable
+            const tumorRegions = document.getElementById('tumorRegions');
+            if (image.type === 'tumor') {
+                tumorRegions.innerHTML = `
+                    <div style="background: rgba(231, 76, 60, 0.1); padding: 15px; border-radius: 10px; margin-top: 10px;">
+                        <div style="font-weight: 600; color: #e74c3c;">Tumor Regions Detected:</div>
+                        <div style="display: flex; gap: 10px; margin-top: 10px;">
+                            <div style="width: 50px; height: 50px; border: 2px solid #e74c3c; border-radius: 5px; background: rgba(231, 76, 60, 0.2);"></div>
+                            <div style="width: 60px; height: 40px; border: 2px solid #e74c3c; border-radius: 5px; background: rgba(231, 76, 60, 0.3); position: relative; top: 10px;"></div>
+                            <div style="width: 40px; height: 60px; border: 2px solid #e74c3c; border-radius: 5px; background: rgba(231, 76, 60, 0.4); position: relative; top: -5px;"></div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                tumorRegions.innerHTML = '';
+            }
+        }
+        
+        function updateDatasetInfo() {
+            const tumorCount = dataset.filter(img => img.type === 'tumor').length;
+            const normalCount = dataset.filter(img => img.type === 'normal').length;
+            
+            document.getElementById('totalImages').textContent = dataset.length;
+            document.getElementById('tumorImages').textContent = tumorCount;
+            document.getElementById('normalImages').textContent = normalCount;
+            document.getElementById('classBalance').textContent = 
+                tumorCount === normalCount ? 'Balanced' : 'Imbalanced';
+            
+            document.getElementById('datasetInfo').style.display = 'block';
+        }
+        
+        function showTumorExamples() {
+            const tumorImages = dataset.filter(img => img.type === 'tumor');
+            alert(`Showing ${tumorImages.length} tumor examples:\n\n${tumorImages.map(img => `• ${img.label}: ${img.features}`).join('\n')}`);
+        }
+        
+        function showNormalExamples() {
+            const normalImages = dataset.filter(img => img.type === 'normal');
+            alert(`Showing ${normalImages.length} normal examples:\n\n${normalImages.map(img => `• ${img.label}: ${img.features}`).join('\n')}`);
+        }
+        
+        // Step 3: Image preprocessing
+        function toggleProcessing(type) {
+            const card = event.currentTarget;
+            if (activeProcessing.has(type)) {
+                activeProcessing.delete(type);
+                card.classList.remove('active');
+            } else {
+                activeProcessing.add(type);
+                card.classList.add('active');
+            }
+            
+            // Update preview
+            updatePreprocessingPreview();
+        }
+        
+        function updateContrast() {
+            document.getElementById('contrastValue').textContent = document.getElementById('contrastSlider').value;
+            updatePreprocessingPreview();
+        }
+        
+        function updateBrightness() {
+            document.getElementById('brightnessValue').textContent = document.getElementById('brightnessSlider').value;
+            updatePreprocessingPreview();
+        }
+        
+        function updateAugmentation() {
+            document.getElementById('augmentationValue').textContent = document.getElementById('augmentationSlider').value;
+        }
+        
+        function updatePreprocessingPreview() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 300;
+            canvas.height = 200;
+            const ctx = canvas.getContext('2d');
+            
+            // Draw original histopathology pattern
+            drawHistoPattern(ctx, 'tumor');
+            
+            // Apply contrast if selected
+            if (activeProcessing.has('contrast')) {
+                const contrast = parseFloat(document.getElementById('contrastSlider').value);
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const data = imageData.data;
+                
+                for (let i = 0; i < data.length; i += 4) {
+                    data[i] = clamp((data[i] - 128) * contrast + 128);
+                    data[i + 1] = clamp((data[i + 1] - 128) * contrast + 128);
+                    data[i + 2] = clamp((data[i + 2] - 128) * contrast + 128);
+                }
+                ctx.putImageData(imageData, 0, 0);
+            }
+            
+            document.getElementById('preprocessingPreview').src = canvas.toDataURL();
+        }
+        
+        function clamp(value) {
+            return Math.max(0, Math.min(255, value));
+        }
+        
+        function applyPreprocessing() {
+            if (!isDatasetLoaded) {
+                showNotification('Please load dataset first!', 'error');
+                return;
+            }
+            
+            processedData = JSON.parse(JSON.stringify(dataset)); // Deep copy
+            
+            let steps = [];
+            if (activeProcessing.has('normalize')) steps.push('Color normalization');
+            if (activeProcessing.has('augment')) steps.push('Data augmentation');
+            if (activeProcessing.has('contrast')) steps.push('Contrast enhancement');
+            if (activeProcessing.has('remove')) steps.push('Artifact removal');
+            
+            if (steps.length === 0) {
+                showNotification('No preprocessing steps selected. Using original data.', 'warning');
+            } else {
+                showNotification(`Applied preprocessing: ${steps.join(', ')}`, 'success');
+            }
+        }
+        
+        // Step 4: Model training
+        function updateSplitValue() {
+            document.getElementById('splitValue').textContent = 
+                document.getElementById('trainSplit').value + '%';
+        }
+        
+        function updateEpochs() {
+            document.getElementById('epochsValue').textContent = 
+                document.getElementById('epochsSlider').value;
+        }
+        
+        function trainModels() {
+            if (!isDatasetLoaded) {
+                showNotification('Please load dataset first!', 'error');
+                return;
+            }
+            
+            // Get selected models
+            const selectedModels = [];
+            if (document.getElementById('modelCNN').checked) selectedModels.push('Basic CNN');
+            if (document.getElementById('modelResNet').checked) selectedModels.push('ResNet-50');
+            if (document.getElementById('modelVGG').checked) selectedModels.push('VGG-16');
+            if (document.getElementById('modelMobileNet').checked) selectedModels.push('MobileNetV2');
+            
+            if (selectedModels.length === 0) {
+                showNotification('Please select at least one model!', 'error');
+                return;
+            }
+            
+            const epochs = parseInt(document.getElementById('epochsSlider').value);
+            const trainSplit = parseInt(document.getElementById('trainSplit').value) / 100;
+            
+            // Show training progress
+            const progressBar = document.getElementById('trainingProgress');
+            const trainingStatus = document.getElementById('trainingStatus');
+            let progress = 0;
+            
+            const interval = setInterval(() => {
+                progress += 5;
+                progressBar.style.width = `${progress}%`;
+                trainingStatus.textContent = `Training models... ${progress}%`;
+                
+                if (progress >= 100) {
+                    clearInterval(interval);
+                    completeTraining(selectedModels, trainSplit, epochs);
+                }
+            }, 200);
+            
+            showNotification(`Training ${selectedModels.length} model(s) with ${epochs} epochs...`, 'info');
+        }
+        
+        function completeTraining(selectedModels, trainSplit, epochs) {
+            // Simulate training results
+            const modelResults = {};
+            let bestAccuracy = 0;
+            let bestModelName = '';
+            
+            selectedModels.forEach(modelName => {
+                const results = simulateModelTraining(modelName, trainSplit, epochs);
+                modelResults[modelName] = results;
+                
+                if (results.accuracy > bestAccuracy) {
+                    bestAccuracy = results.accuracy;
+                    bestModelName = modelName;
+                }
+            });
+            
+            // Store best model
+            bestModel = {
+                name: bestModelName,
+                ...modelResults[bestModelName]
+            };
+            
+            // Display results
+            displayModelComparison(modelResults);
+            updatePerformanceChart(modelResults);
+            updateEvaluationMetrics();
+            
+            // Enable evaluation and prediction
+            document.getElementById('evaluationControls').style.display = 'block';
+            document.getElementById('predictionControls').style.display = 'block';
+            document.getElementById('noModelMessage').style.display = 'none';
+            document.getElementById('bestModelName').textContent = bestModelName;
+            
+            document.getElementById('trainingProgress').style.width = '0%';
+            document.getElementById('trainingStatus').textContent = 'Training complete!';
+            
+            isModelsTrained = true;
+            
+            showNotification(`Models trained successfully! Best model: ${bestModelName} (Accuracy: ${(bestAccuracy * 100).toFixed(1)}%)`, 'success');
+        }
+        
+        function simulateModelTraining(modelName, trainSplit, epochs) {
+            // Simulate different performance for different models
+            const results = {
+                accuracy: 0,
+                precision: 0,
+                recall: 0,
+                f1: 0,
+                auc: 0,
+                training_time: 0,
+                params: 0
+            };
+            
+            // Base performance with some randomness
+            const baseAccuracy = 0.85 + Math.random() * 0.12;
+            
+            switch(modelName) {
+                case 'Basic CNN':
+                    results.accuracy = baseAccuracy - 0.05;
+                    results.precision = results.accuracy * 0.95;
+                    results.recall = results.accuracy * 0.93;
+                    results.f1 = 2 * (results.precision * results.recall) / (results.precision + results.recall);
+                    results.auc = results.accuracy + 0.02;
+                    results.training_time = epochs * 2;
+                    results.params = 1.2;
+                    break;
+                    
+                case 'ResNet-50':
+                    results.accuracy = baseAccuracy + 0.03;
+                    results.precision = results.accuracy * 0.97;
+                    results.recall = results.accuracy * 0.96;
+                    results.f1 = 2 * (results.precision * results.recall) / (results.precision + results.recall);
+                    results.auc = results.accuracy + 0.03;
+                    results.training_time = epochs * 3;
+                    results.params = 25.6;
+                    break;
+                    
+                case 'VGG-16':
+                    results.accuracy = baseAccuracy;
+                    results.precision = results.accuracy * 0.96;
+                    results.recall = results.accuracy * 0.94;
+                    results.f1 = 2 * (results.precision * results.recall) / (results.precision + results.recall);
+                    results.auc = results.accuracy + 0.02;
+                    results.training_time = epochs * 4;
+                    results.params = 138.4;
+                    break;
+                    
+                case 'MobileNetV2':
+                    results.accuracy = baseAccuracy - 0.02;
+                    results.precision = results.accuracy * 0.94;
+                    results.recall = results.accuracy * 0.95;
+                    results.f1 = 2 * (results.precision * results.recall) / (results.precision + results.recall);
+                    results.auc = results.accuracy + 0.01;
+                    results.training_time = epochs * 1.5;
+                    results.params = 3.5;
+                    break;
+            }
+            
+            // Add confusion matrix values
+            results.tp = Math.floor(100 * results.recall);
+            results.fn = 100 - results.tp;
+            results.tn = Math.floor(100 * results.precision);
+            results.fp = 100 - results.tn;
+            
+            return results;
+        }
+        
+        function displayModelComparison(modelResults) {
+            const comparisonDiv = document.getElementById('modelComparison');
+            comparisonDiv.innerHTML = '';
+            comparisonDiv.style.display = 'grid';
+            
+            let bestAccuracy = 0;
+            let bestModelName = '';
+            
+            Object.keys(modelResults).forEach(modelName => {
+                const results = modelResults[modelName];
+                if (results.accuracy > bestAccuracy) {
+                    bestAccuracy = results.accuracy;
+                    bestModelName = modelName;
+                }
+                
+                // Get model icon
+                let iconClass = '';
+                let icon = '';
+                if (modelName === 'Basic CNN') {
+                    iconClass = 'cnn-icon';
+                    icon = 'layer-group';
+                } else if (modelName === 'ResNet-50') {
+                    iconClass = 'resnet-icon';
+                    icon = 'project-diagram';
+                } else if (modelName === 'VGG-16') {
+                    iconClass = 'vgg-icon';
+                    icon = 'cubes';
+                } else if (modelName === 'MobileNetV2') {
+                    iconClass = 'mobile-icon';
+                    icon = 'mobile-alt';
+                }
+                
+                const card = document.createElement('div');
+                card.className = 'model-card';
+                if (modelName === bestModelName) {
+                    card.classList.add('best-model');
+                    card.innerHTML = `<div class="best-badge"><i class="fas fa-crown"></i> Best Model</div>`;
+                }
+                
+                card.innerHTML += `
+                    <h4>
+                        <div class="model-icon ${iconClass}">
+                            <i class="fas fa-${icon}"></i>
+                        </div>
+                        ${modelName}
+                    </h4>
+                    <div class="model-stats">
+                        <div class="stat-card">
+                            <div class="stat-value">${(results.accuracy * 100).toFixed(1)}%</div>
+                            <div class="stat-label">Accuracy</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value">${(results.f1 * 100).toFixed(1)}%</div>
+                            <div class="stat-label">F1-Score</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value">${results.training_time}s</div>
+                            <div class="stat-label">Training Time</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value">${results.params}M</div>
+                            <div class="stat-label">Parameters</div>
+                        </div>
+                    </div>
+                `;
+                
+                comparisonDiv.appendChild(card);
+            });
+            
+            // Show training results
+            document.getElementById('trainingResults').style.display = 'block';
+            document.getElementById('bestModelInfo').innerHTML = `
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin: 20px 0;">
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 10px;">
+                        <div style="font-weight: 600; color: #4a69bd; font-size: 0.9rem;">Best Model</div>
+                        <div style="font-size: 1.3rem; font-weight: 700; color: #0c2461;">${bestModelName}</div>
+                    </div>
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 10px;">
+                        <div style="font-weight: 600; color: #4a69bd; font-size: 0.9rem;">Accuracy</div>
+                        <div style="font-size: 1.3rem; font-weight: 700; color: #27ae60;">${(bestAccuracy * 100).toFixed(1)}%</div>
+                    </div>
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 10px;">
+                        <div style="font-weight: 600; color: #4a69bd; font-size: 0.9rem;">Train-Test Split</div>
+                        <div style="font-size: 1.3rem; font-weight: 700; color: #3498db;">${document.getElementById('trainSplit').value}% / ${100 - parseInt(document.getElementById('trainSplit').value)}%</div>
+                    </div>
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 10px;">
+                        <div style="font-weight: 600; color: #4a69bd; font-size: 0.9rem;">Training Epochs</div>
+                        <div style="font-size: 1.3rem; font-weight: 700; color: #9b59b6;">${document.getElementById('epochsSlider').value}</div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function initializeCharts() {
+            // Performance chart
+            const perfCtx = document.getElementById('performanceChart').getContext('2d');
+            charts.performanceChart = new Chart(perfCtx, {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: 'Accuracy',
+                            data: [],
+                            backgroundColor: '#0c2461',
+                            borderColor: '#1e3799',
+                            borderWidth: 2,
+                            borderRadius: 5,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'F1-Score',
+                            data: [],
+                            backgroundColor: '#2ecc71',
+                            borderColor: '#27ae60',
+                            borderWidth: 2,
+                            borderRadius: 5,
+                            yAxisID: 'y'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 1,
+                            title: {
+                                display: true,
+                                text: 'Score',
+                                font: { size: 14, weight: 'bold' },
+                                color: '#0c2461'
+                            }
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.dataset.label}: ${(context.parsed.y * 100).toFixed(1)}%`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // ROC Curve chart
+            const rocCtx = document.getElementById('rocChart').getContext('2d');
+            charts.rocChart = new Chart(rocCtx, {
+                type: 'line',
+                data: {
+                    labels: ['0', '0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9', '1'],
+                    datasets: [{
+                        label: 'ROC Curve',
+                        data: [0, 0.1, 0.2, 0.35, 0.55, 0.75, 0.85, 0.92, 0.96, 0.98, 1],
+                        borderColor: '#0c2461',
+                        backgroundColor: 'rgba(12, 36, 97, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4
+                    },
+                    {
+                        label: 'Random Classifier',
+                        data: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1],
+                        borderColor: '#95a5a6',
+                        borderWidth: 1,
+                        borderDash: [5, 5],
+                        fill: false
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'False Positive Rate',
+                                font: { size: 14, weight: 'bold' },
+                                color: '#0c2461'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'True Positive Rate',
+                                font: { size: 14, weight: 'bold' },
+                                color: '#0c2461'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function updatePerformanceChart(modelResults) {
+            const modelNames = Object.keys(modelResults);
+            const accuracies = modelNames.map(name => modelResults[name].accuracy);
+            const f1Scores = modelNames.map(name => modelResults[name].f1);
+            
+            charts.performanceChart.data.labels = modelNames;
+            charts.performanceChart.data.datasets[0].data = accuracies;
+            charts.performanceChart.data.datasets[1].data = f1Scores;
+            charts.performanceChart.update();
+        }
+        
+        function updateEvaluationMetrics() {
+            if (!bestModel) return;
+            
+            document.getElementById('accuracyValue').textContent = bestModel.accuracy.toFixed(3);
+            document.getElementById('precisionValue').textContent = bestModel.precision.toFixed(3);
+            document.getElementById('recallValue').textContent = bestModel.recall.toFixed(3);
+            document.getElementById('f1Value').textContent = bestModel.f1.toFixed(3);
+            document.getElementById('aucValue').textContent = bestModel.auc.toFixed(3);
+            
+            document.getElementById('tpValue').textContent = bestModel.tp;
+            document.getElementById('fpValue').textContent = bestModel.fp;
+            document.getElementById('fnValue').textContent = bestModel.fn;
+            document.getElementById('tnValue').textContent = bestModel.tn;
+            
+            // Update ROC curve with model's AUC
+            charts.rocChart.data.datasets[0].label = `ROC Curve (AUC = ${bestModel.auc.toFixed(3)})`;
+            charts.rocChart.update();
+        }
+        
+        // Step 6: Test on new images
+        function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            if (!file.type.match('image.*')) {
+                showNotification('Please upload an image file!', 'error');
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('testImageContainer').style.display = 'block';
+                document.getElementById('testImagePreview').src = e.target.result;
+                
+                // Simulate prediction
+                simulatePrediction(file.name);
+            };
+            reader.readAsDataURL(file);
+            
+            showNotification('Image uploaded successfully! Analyzing...', 'success');
+        }
+        
+        function loadRandomTestImage() {
+            const randomImages = [
+                { name: 'Tumor_Sample_1.jpg', type: 'tumor', probability: 0.92 },
+                { name: 'Normal_Tissue_2.jpg', type: 'normal', probability: 0.15 },
+                { name: 'Suspicious_Region_3.jpg', type: 'tumor', probability: 0.78 },
+                { name: 'Benign_Tissue_4.jpg', type: 'normal', probability: 0.08 }
+            ];
+            
+            const randomImage = randomImages[Math.floor(Math.random() * randomImages.length)];
+            
+            // Create simulated image
+            const canvas = document.createElement('canvas');
+            canvas.width = 400;
+            canvas.height = 300;
+            const ctx = canvas.getContext('2d');
+            drawHistoPattern(ctx, randomImage.type);
+            
+            document.getElementById('testImageContainer').style.display = 'block';
+            document.getElementById('testImagePreview').src = canvas.toDataURL();
+            
+            simulatePrediction(randomImage.name, randomImage.type, randomImage.probability);
+        }
+        
+        function simulatePrediction(filename, type = null, probability = null) {
+            if (!isModelsTrained) {
+                showNotification('Please train models first!', 'error');
+                return;
+            }
+            
+            // Simulate prediction with some randomness
+            if (type === null) {
+                type = Math.random() > 0.5 ? 'tumor' : 'normal';
+            }
+            if (probability === null) {
+                probability = type === 'tumor' ? 
+                    0.7 + Math.random() * 0.25 : 
+                    Math.random() * 0.3;
+            }
+            
+            // Add model uncertainty
+            const uncertainty = 0.1;
+            const adjustedProbability = Math.max(0, Math.min(1, 
+                probability + (Math.random() * uncertainty * 2 - uncertainty)));
+            
+            // Update UI
+            document.getElementById('tumorProbability').textContent = adjustedProbability.toFixed(3);
+            
+            const indicator = document.getElementById('tumorIndicator');
+            if (adjustedProbability > 0.5) {
+                indicator.textContent = 'TUMOR DETECTED';
+                indicator.className = 'tumor-indicator tumor-positive';
+                document.getElementById('predictionResult').innerHTML = `
+                    <strong>Clinical Alert:</strong> High probability of tumor tissue detected.<br>
+                    <small>Recommend biopsy confirmation.</small>
+                `;
+            } else {
+                indicator.textContent = 'NORMAL TISSUE';
+                indicator.className = 'tumor-indicator tumor-negative';
+                document.getElementById('predictionResult').innerHTML = `
+                    <strong>Finding:</strong> Tissue appears normal.<br>
+                    <small>No malignant features detected.</small>
+                `;
+            }
+            
+            // Show confidence interval
+            const confidence = 0.9;
+            const margin = (1 - confidence) * 0.2;
+            document.getElementById('confidenceInterval').innerHTML = `
+                <div style="margin-bottom: 8px;">
+                    <i class="fas fa-shield-alt"></i> <strong>Model Confidence:</strong> ${(confidence * 100).toFixed(0)}%
+                </div>
+                <div style="margin-bottom: 8px;">
+                    <i class="fas fa-chart-line"></i> <strong>Probability Range:</strong> ${Math.max(0, adjustedProbability - margin).toFixed(3)} - ${Math.min(1, adjustedProbability + margin).toFixed(3)}
+                </div>
+                <div style="font-size: 0.8rem; opacity: 0.8;">
+                    <i class="fas fa-info-circle"></i> Based on model accuracy: ${(bestModel.accuracy * 100).toFixed(1)}%
+                </div>
+            `;
+            
+            showNotification(`Prediction complete: ${adjustedProbability > 0.5 ? 'Tumor detected' : 'Normal tissue'} (${(adjustedProbability * 100).toFixed(1)}% probability)`, 'success');
+        }
+        
+        function analyzeTumorRegions() {
+            if (!document.getElementById('testImageContainer').style.display || 
+                document.getElementById('testImageContainer').style.display === 'none') {
+                showNotification('Please upload or select a test image first!', 'error');
+                return;
+            }
+            
+            // Simulate tumor region analysis
+            const regions = [
+                { x: '20%', y: '30%', width: '15%', height: '12%', confidence: 0.89 },
+                { x: '60%', y: '45%', width: '10%', height: '8%', confidence: 0.76 },
+                { x: '35%', y: '70%', width: '8%', height: '6%', confidence: 0.92 }
+            ];
+            
+            let analysisHTML = '<div style="margin-top: 20px;"><h4>Tumor Region Analysis:</h4>';
+            regions.forEach((region, index) => {
+                analysisHTML += `
+                    <div style="background: rgba(231, 76, 60, 0.1); padding: 10px; border-radius: 8px; margin: 10px 0;">
+                        <strong>Region ${index + 1}:</strong> ${(region.confidence * 100).toFixed(1)}% confidence<br>
+                        <small>Location: (${region.x}, ${region.y}), Size: ${region.width} × ${region.height}</small>
+                    </div>
+                `;
+            });
+            analysisHTML += '</div>';
+            
+            document.getElementById('clinicalInterpretation').innerHTML += analysisHTML;
+            
+            showNotification('Tumor region analysis complete! 3 suspicious regions identified.', 'success');
+        }
+        
+        // Step 7: Lab report
+        function generateLabReport() {
+            if (!isModelsTrained) {
+                showNotification('Please train models first to generate a report!', 'error');
+                return;
+            }
+            
+            const report = `
+CANCER DETECTION VIRTUAL LAB REPORT
+====================================
+Date: ${new Date().toLocaleString()}
+Student: [Your Name Here]
+Instructor: Dr. P. Selvarengan
+
+EXPERIMENT OVERVIEW
+-------------------
+This virtual lab simulates tumor detection in histopathology images using
+deep learning. Based on Camelyon16 dataset, the experiment trains binary
+classifiers to distinguish tumor tissue from normal tissue.
+
+DATASET INFORMATION
+-------------------
+Total Images Analyzed: ${dataset.length}
+Tumor Images: ${dataset.filter(img => img.type === 'tumor').length}
+Normal Images: ${dataset.filter(img => img.type === 'normal').length}
+Preprocessing Applied: ${Array.from(activeProcessing).join(', ') || 'None'}
+
+MODEL TRAINING RESULTS
+----------------------
+Best Model: ${bestModel.name}
+- Accuracy: ${(bestModel.accuracy * 100).toFixed(1)}%
+- Precision: ${(bestModel.precision * 100).toFixed(1)}%
+- Recall: ${(bestModel.recall * 100).toFixed(1)}%
+- F1-Score: ${(bestModel.f1 * 100).toFixed(1)}%
+- AUC: ${bestModel.auc.toFixed(3)}
+
+Training Configuration:
+- Train-Test Split: ${document.getElementById('trainSplit').value}% / ${100 - parseInt(document.getElementById('trainSplit').value)}%
+- Epochs: ${document.getElementById('epochsSlider').value}
+- CNN Architectures Tested: ${Object.keys(models).join(', ')}
+
+CONFUSION MATRIX
+----------------
+True Positives: ${bestModel.tp}
+False Positives: ${bestModel.fp}
+False Negatives: ${bestModel.fn}
+True Negatives: ${bestModel.tn}
+
+CLINICAL INTERPRETATION
+-----------------------
+1. Model Performance Assessment:
+   - The ${bestModel.name} achieved ${(bestModel.accuracy * 100).toFixed(1)}% accuracy,
+     indicating good discriminative ability.
+   - Recall of ${(bestModel.recall * 100).toFixed(1)}% suggests the model is effective
+     at identifying true tumor cases (low false negative rate).
+   - Precision of ${(bestModel.precision * 100).toFixed(1)}% indicates reliable
+     positive predictions (low false positive rate).
+
+2. Clinical Implications:
+   - AUC of ${bestModel.auc.toFixed(3)} suggests excellent diagnostic ability
+   - Model could assist pathologists in screening large volumes of slides
+   - Important to maintain human oversight for final diagnosis
+
+LAB QUESTIONS ANSWERS
+---------------------
+[Answer the lab questions here based on your observations]
+
+1. Which preprocessing steps were most effective for histopathology images?
+   [Your answer]
+
+2. Which CNN architecture performed best and why?
+   [Your answer]
+
+3. How do accuracy, precision, recall, and F1-score differ in medical diagnosis?
+   [Your answer]
+
+4. What challenges did you encounter in tumor detection?
+   [Your answer]
+
+5. What are the clinical implications of your model's performance?
+   [Your answer]
+
+LIMITATIONS AND FUTURE WORK
+---------------------------
+1. Dataset Limitations:
+   - Limited to breast cancer histopathology
+   - Small sample size compared to clinical practice
+   - No information on tumor grade or subtype
+
+2. Technical Limitations:
+   - 2D images only (no 3D tissue reconstruction)
+   - Single magnification level
+   - No clinical metadata integration
+
+3. Recommendations for Improvement:
+   - Include multi-scale analysis
+   - Add clinical metadata (patient age, tumor grade)
+   - Implement ensemble methods
+   - Validate on external datasets
+
+CONCLUSION
+----------
+This experiment successfully demonstrated the application of deep learning
+for automated tumor detection in histopathology images. The ${bestModel.name}
+model showed promising performance with ${(bestModel.accuracy * 100).toFixed(1)}%
+accuracy, highlighting the potential of AI-assisted pathology for improving
+diagnostic efficiency and accuracy in cancer detection.
+
+---
+Report Generated: ${new Date().toLocaleString()}
+Virtual Lab Developed by: Dr. P. Selvarengan
+Light & Imaging Laboratory
+            `;
+            
+            // Create download link
+            const blob = new Blob([report], { type: 'text/plain' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `cancer_detection_lab_report_${new Date().toISOString().slice(0,10)}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+            
+            showNotification('Lab report generated and downloaded! Open the file to complete your answers.', 'success');
+        }
+        
+        function saveAllResults() {
+            if (!isModelsTrained) {
+                showNotification('No results to save. Please train models first.', 'error');
+                return;
+            }
+            
+            const results = {
+                datasetInfo: {
+                    totalImages: dataset.length,
+                    tumorImages: dataset.filter(img => img.type === 'tumor').length,
+                    normalImages: dataset.filter(img => img.type === 'normal').length,
+                    preprocessing: Array.from(activeProcessing).join(', ')
+                },
+                modelResults: {
+                    bestModel: bestModel.name,
+                    accuracy: bestModel.accuracy,
+                    precision: bestModel.precision,
+                    recall: bestModel.recall,
+                    f1: bestModel.f1,
+                    auc: bestModel.auc,
+                    confusionMatrix: {
+                        tp: bestModel.tp,
+                        fp: bestModel.fp,
+                        fn: bestModel.fn,
+                        tn: bestModel.tn
+                    }
+                },
+                configuration: {
+                    trainSplit: document.getElementById('trainSplit').value,
+                    epochs: document.getElementById('epochsSlider').value,
+                    timestamp: new Date().toLocaleString()
+                },
+                developer: "Dr. P. Selvarengan",
+                laboratory: "Light & Imaging Laboratory"
+            };
+            
+            const dataStr = JSON.stringify(results, null, 2);
+            const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+            const fileName = `cancer_detection_results_${new Date().toISOString().slice(0,10)}.json`;
+            
+            const link = document.createElement('a');
+            link.href = dataUri;
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            showNotification('All results saved as JSON file!', 'success');
+        }
+        
+        function resetLab() {
+            if (confirm("Reset the entire lab? This will clear all data, models, and results.")) {
+                // Reset all variables
+                dataset = [];
+                processedData = [];
+                selectedImages = [];
+                bestModel = null;
+                models = {};
+                isDatasetLoaded = false;
+                isModelsTrained = false;
+                activeProcessing.clear();
+                
+                // Reset UI elements
+                document.getElementById('imageGallery').innerHTML = '';
+                document.getElementById('datasetInfo').style.display = 'none';
+                document.getElementById('imageDetails').style.display = 'none';
+                document.getElementById('modelComparison').innerHTML = '';
+                document.getElementById('modelComparison').style.display = 'none';
+                document.getElementById('trainingResults').style.display = 'none';
+                document.getElementById('evaluationControls').style.display = 'none';
+                document.getElementById('predictionControls').style.display = 'none';
+                document.getElementById('noModelMessage').style.display = 'block';
+                document.getElementById('testImageContainer').style.display = 'none';
+                
+                // Reset processing cards
+                document.querySelectorAll('.processing-card').forEach(card => {
+                    card.classList.remove('active');
+                });
+                
+                // Reset sliders
+                document.getElementById('contrastSlider').value = 1.5;
+                document.getElementById('contrastValue').textContent = '1.5';
+                document.getElementById('brightnessSlider').value = 1.2;
+                document.getElementById('brightnessValue').textContent = '1.2';
+                document.getElementById('augmentationSlider').value = 0.3;
+                document.getElementById('augmentationValue').textContent = '0.3';
+                document.getElementById('trainSplit').value = 80;
+                document.getElementById('splitValue').textContent = '80%';
+                document.getElementById('epochsSlider').value = 20;
+                document.getElementById('epochsValue').textContent = '20';
+                
+                // Reset prediction display
+                document.getElementById('tumorProbability').textContent = '--';
+                document.getElementById('tumorIndicator').textContent = '--';
+                document.getElementById('tumorIndicator').className = 'tumor-indicator';
+                document.getElementById('predictionResult').textContent = 'Upload an image to see prediction';
+                document.getElementById('confidenceInterval').innerHTML = '';
+                document.getElementById('bestModelName').textContent = 'None selected';
+                
+                // Reset progress bar
+                document.getElementById('trainingProgress').style.width = '0%';
+                document.getElementById('trainingStatus').textContent = 'Ready to train';
+                
+                showNotification('Lab reset successfully! You can now start a new experiment.', 'info');
+            }
+        }
+    </script>
+</body>
+</html>
